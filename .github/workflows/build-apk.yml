@@ -1,0 +1,107 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'AI-Phone-Auditor-source.zip'
+      - '.github/workflows/build-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3
+        with:
+          gradle-version: '8.13'
+      - name: Locate source project or unpack phone upload
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f settings.gradle.kts; then
+            echo 'path=.' >> "$GITHUB_OUTPUT"
+          elif test -f AI-Phone-Auditor-source.zip; then
+            python3 - <<'PY'
+          import pathlib, zipfile
+          destination = pathlib.Path('_project').resolve()
+          destination.mkdir(exist_ok=True)
+          with zipfile.ZipFile('AI-Phone-Auditor-source.zip') as archive:
+              if sum(i.file_size for i in archive.infolist()) > 50 * 1024 * 1024:
+                  raise RuntimeError('Unexpectedly large source archive')
+              for item in archive.infolist():
+                  path = (destination / item.filename).resolve()
+                  if not path.is_relative_to(destination):
+                      raise RuntimeError('Unsafe archive path')
+              archive.extractall(destination)
+          if not (destination / 'settings.gradle.kts').is_file():
+              raise RuntimeError('settings.gradle.kts must be at archive root')
+          PY
+            echo 'path=_project' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Upload AI-Phone-Auditor-source.zip to the repository root first.' >&2
+            exit 1
+          fi
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_HOME:-}" || { echo 'ANDROID_HOME is missing'; exit 1; }
+          if ! test -f "$ANDROID_HOME/platforms/android-35/android.jar" || ! test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"; then
+            SDKMANAGER="$(command -v sdkmanager || true)"
+            if test -z "$SDKMANAGER"; then SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"; fi
+            test -x "$SDKMANAGER"
+            python3 -c 'print("y\n" * 200)' > "$RUNNER_TEMP/android-licenses.txt"
+            "$SDKMANAGER" --licenses < "$RUNNER_TEMP/android-licenses.txt" > /dev/null
+            "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          fi
+      - name: Test, lint and build APK
+        working-directory: ${{ steps.project.outputs.path }}
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Verify and package APK
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/artifacts"
+          mkdir -p "$OUT"
+          cp app/build/outputs/apk/debug/app-debug.apk "$OUT/AI-Phone-Auditor-1.0.0-debug.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$OUT/AI-Phone-Auditor-1.0.0-debug.apk" > "$OUT/signature.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions "$OUT/AI-Phone-Auditor-1.0.0-debug.apk" > "$OUT/permissions.txt"
+          if grep -q 'android.permission.INTERNET' "$OUT/permissions.txt"; then
+            echo 'Unexpected INTERNET permission' >&2; exit 1
+          fi
+          cd "$OUT"
+          sha256sum AI-Phone-Auditor-1.0.0-debug.apk > SHA256SUMS.txt
+      - name: Downloadable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Phone-Auditor-APK
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Diagnostic build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-reports
+          path: |
+            **/app/build/reports/
+            **/app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

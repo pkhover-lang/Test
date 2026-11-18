@@ -1,0 +1,14 @@
+<resources>
+    <style name="AuditorTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#65E0CE</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#0B1220</item>
+        <item name="android:statusBarColor">#0B1220</item>
+        <item name="android:navigationBarColor">#0B1220</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>

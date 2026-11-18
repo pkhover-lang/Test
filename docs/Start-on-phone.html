@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Phone Auditor — получение APK</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1220;color:#ebf2fa;font:16px/1.65 system-ui,-apple-system,sans-serif}main{max-width:850px;margin:auto;padding:26px 20px 60px}.eyebrow{color:#65e0ce;letter-spacing:.15em;font-size:12px;font-weight:700}h1{font-size:clamp(28px,6vw,42px);line-height:1.15;margin:16px 0}h2{font-size:21px;line-height:1.35}p{margin:10px 0}.lead{color:#a1b2ca}.card{background:#152134;padding:20px;border-radius:18px;margin:16px 0}.warn{border-left:4px solid #ffc470}.warn strong{color:#ffc470}code{overflow-wrap:anywhere;color:#8fe8da}a{color:#65e0ce}button{border:0;border-radius:12px;background:#65e0ce;color:#0b1220;font-weight:700;font-size:15px;padding:15px 20px;cursor:pointer;min-height:48px}textarea{width:100%;height:420px;resize:vertical;background:#090f1c;color:#d2e0f0;border:1px solid #354b69;border-radius:12px;padding:14px;font:12px/1.5 ui-monospace,monospace;white-space:pre}small{color:#a1b2ca}.number{color:#65e0ce}footer{margin-top:28px;border-top:1px solid #354b69;padding-top:16px;color:#a1b2ca;font-size:13px}
+</style></head><body><main>
+<div class="eyebrow">AI / PHONE AUDITOR · ИСХОДНЫЙ ПРОЕКТ 1.0</div>
+<h1>Получить APK,<br>пользуясь телефоном</h1>
+<p class="lead">Диагностика — на Android. Сборка — в GitHub Actions. Компьютер, root и ADB пользователю не нужны.</p>
+<div class="card warn"><strong>Готовый APK пока не собран.</strong><p>Здесь инструкция для сборки исходников. В среде подготовки не было Android SDK и не удалось загрузить инструменты. Проверены 30 сценариев ядра и JSON; Android-сборка и запуск на устройстве еще не проверялись.</p></div>
+<div class="card"><h2><span class="number">01</span> · Сохрани исходники</h2><p>Скачай из сообщения файл <code>AI-Phone-Auditor-source.zip</code>. Не переименовывай и не распаковывай: сервер сам извлечет файлы. В этом ZIP нет установочного APK.</p></div>
+<div class="card"><h2><span class="number">02</span> · Создай репозиторий</h2><p>В браузере открой GitHub, войди в аккаунт и создай репозиторий <code>ai-phone-auditor</code>. Выбери Private и добавление README. При необходимости включи в браузере «Версия для ПК» — это лишь режим отображения.</p><p>Нужны аккаунт и доступные Actions. Сборка использует серверные ресурсы и квоту аккаунта. Диагностические отчеты телефона в GitHub загружать не нужно.</p></div>
+<div class="card"><h2><span class="number">03</span> · Загрузи ZIP</h2><p><b>Add file → Upload files → Choose your files.</b> Загрузи <code>AI-Phone-Auditor-source.zip</code> прямо в корень репозитория. Нажми <b>Commit changes</b>.</p></div>
+<div class="card"><h2><span class="number">04</span> · Добавь сценарий сборки</h2><p>Открой <b>Add file → Create new file</b>. Имя файла:</p><p><code>.github/workflows/build-apk.yml</code></p><p>Скопируй весь текст ниже в редактор и сохрани через <b>Commit changes</b>. YAML в корне репозитория не запустится — нужен именно указанный путь.</p>
+<button id="copy" type="button">Скопировать сценарий</button><p id="copy-status" role="status" aria-live="polite"></p>
+<textarea id="workflow" aria-label="Полный сценарий GitHub Actions" readonly>name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - &#x27;app/**&#x27;
+      - &#x27;*.gradle.kts&#x27;
+      - &#x27;gradle.properties&#x27;
+      - &#x27;AI-Phone-Auditor-source.zip&#x27;
+      - &#x27;.github/workflows/build-apk.yml&#x27;
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: &#x27;17&#x27;
+      - name: Set up Gradle 8.13
+        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3
+        with:
+          gradle-version: &#x27;8.13&#x27;
+      - name: Locate source project or unpack phone upload
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f settings.gradle.kts; then
+            echo &#x27;path=.&#x27; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+          elif test -f AI-Phone-Auditor-source.zip; then
+            python3 - &lt;&lt;&#x27;PY&#x27;
+          import pathlib, zipfile
+          destination = pathlib.Path(&#x27;_project&#x27;).resolve()
+          destination.mkdir(exist_ok=True)
+          with zipfile.ZipFile(&#x27;AI-Phone-Auditor-source.zip&#x27;) as archive:
+              if sum(i.file_size for i in archive.infolist()) &gt; 50 * 1024 * 1024:
+                  raise RuntimeError(&#x27;Unexpectedly large source archive&#x27;)
+              for item in archive.infolist():
+                  path = (destination / item.filename).resolve()
+                  if not path.is_relative_to(destination):
+                      raise RuntimeError(&#x27;Unsafe archive path&#x27;)
+              archive.extractall(destination)
+          if not (destination / &#x27;settings.gradle.kts&#x27;).is_file():
+              raise RuntimeError(&#x27;settings.gradle.kts must be at archive root&#x27;)
+          PY
+            echo &#x27;path=_project&#x27; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+          else
+            echo &#x27;Upload AI-Phone-Auditor-source.zip to the repository root first.&#x27; &gt;&amp;2
+            exit 1
+          fi
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n &quot;${ANDROID_HOME:-}&quot; || { echo &#x27;ANDROID_HOME is missing&#x27;; exit 1; }
+          if ! test -f &quot;$ANDROID_HOME/platforms/android-35/android.jar&quot; || ! test -x &quot;$ANDROID_HOME/build-tools/35.0.0/apksigner&quot;; then
+            SDKMANAGER=&quot;$(command -v sdkmanager || true)&quot;
+            if test -z &quot;$SDKMANAGER&quot;; then SDKMANAGER=&quot;$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager&quot;; fi
+            test -x &quot;$SDKMANAGER&quot;
+            python3 -c &#x27;print(&quot;y\n&quot; * 200)&#x27; &gt; &quot;$RUNNER_TEMP/android-licenses.txt&quot;
+            &quot;$SDKMANAGER&quot; --licenses &lt; &quot;$RUNNER_TEMP/android-licenses.txt&quot; &gt; /dev/null
+            &quot;$SDKMANAGER&quot; &#x27;platforms;android-35&#x27; &#x27;build-tools;35.0.0&#x27;
+          fi
+      - name: Test, lint and build APK
+        working-directory: ${{ steps.project.outputs.path }}
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Verify and package APK
+        working-directory: ${{ steps.project.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT=&quot;$GITHUB_WORKSPACE/artifacts&quot;
+          mkdir -p &quot;$OUT&quot;
+          cp app/build/outputs/apk/debug/app-debug.apk &quot;$OUT/AI-Phone-Auditor-1.0.0-debug.apk&quot;
+          &quot;$ANDROID_HOME/build-tools/35.0.0/apksigner&quot; verify --verbose --print-certs &quot;$OUT/AI-Phone-Auditor-1.0.0-debug.apk&quot; &gt; &quot;$OUT/signature.txt&quot;
+          &quot;$ANDROID_HOME/build-tools/35.0.0/aapt&quot; dump permissions &quot;$OUT/AI-Phone-Auditor-1.0.0-debug.apk&quot; &gt; &quot;$OUT/permissions.txt&quot;
+          if grep -q &#x27;android.permission.INTERNET&#x27; &quot;$OUT/permissions.txt&quot;; then
+            echo &#x27;Unexpected INTERNET permission&#x27; &gt;&amp;2; exit 1
+          fi
+          cd &quot;$OUT&quot;
+          sha256sum AI-Phone-Auditor-1.0.0-debug.apk &gt; SHA256SUMS.txt
+      - name: Downloadable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Phone-Auditor-APK
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Diagnostic build reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-reports
+          path: |
+            **/app/build/reports/
+            **/app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+</textarea>
+<small>При недоступном копировании выдели текст в поле вручную.</small></div>
+<div class="card"><h2><span class="number">05</span> · Дождись результата</h2><p><b>Actions → Build APK → Run workflow</b> (или открой автоматически запущенную сборку). Workflow выполнит тесты, Lint, сборку APK и проверку подписи.</p><p>При зеленом статусе скачай внизу страницы <b>Artifacts → AI-Phone-Auditor-APK</b> и распакуй архив. Внутри должен быть <code>AI-Phone-Auditor-1.0.0-debug.apk</code> с контрольной суммой и отчетом подписи.</p><p>При красном статусе открой упавший шаг и сохрани текст ошибки. Зеленый CI подтверждает сборку, но не тестирование на твоем Samsung. Артефакт хранится 7 дней.</p></div>
+<div class="card"><h2><span class="number">06</span> · Установи и проверь</h2><p>Открой полученный APK. Для установки вне магазина Android может запросить разрешение у браузера или файлового менеджера. Не отключай Play Protect и не обходи предупреждение о конкретной угрозе: сначала проверь причину.</p><p>В приложении начни с <b>Обзор → Начать диагностику</b>. Для дополнительных данных включи Usage Access в разделе <b>Действия</b>, вернись и повтори проверку.</p><p>Самому аудитору не нужны специальные возможности, администратор, VPN, SMS, контакты, фото или геолокация.</p></div>
+<div class="card"><h2>Передать результат на анализ</h2><p><b>Отчет → выбрать состав данных → Предпросмотр → Поделиться JSON</b> или сохранить JSON/TXT и вручную прикрепить в нужный чат. Список программ может раскрывать личные сведения. Время использования и сеть по умолчанию исключены.</p><p>Точные проценты батареи по чужим приложениям, полный автозапуск и антивирусный вердикт здесь не выдаются. Подозрительные сочетания разрешений означают необходимость проверки, а не доказанное заражение.</p></div>
+<div class="card"><h2>Документация</h2><p><a href="https://docs.github.com/en/actions/tutorials/build-and-test-code/java-with-gradle">GitHub: сборка Gradle</a><br><a href="https://docs.github.com/en/repositories/working-with-files/managing-files/adding-a-file-to-a-repository">GitHub: загрузка файлов через браузер</a><br><a href="https://docs.github.com/en/actions/how-tos/manage-workflow-runs/download-workflow-artifacts">GitHub: скачивание артефактов</a></p></div>
+<footer>Локальная HTML-инструкция. Нет аналитики, внешних скриптов и автоматических сетевых запросов. Ссылки открывают официальную документацию только по нажатию. Debug-ключи разных сборок могут отличаться: перед удалением старой установки сохрани нужные отчеты.</footer>
+</main><script>
+const button=document.getElementById('copy'), field=document.getElementById('workflow'), status=document.getElementById('copy-status');
+button.addEventListener('click',async()=>{let success=false;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(field.value);success=true;}}catch(e){}if(!success){field.focus();field.select();field.setSelectionRange(0,field.value.length);try{success=document.execCommand('copy');}catch(e){}}status.textContent=success?'Сценарий скопирован. Вставь его в файл .github/workflows/build-apk.yml.':'Текст выделен. Выбери «Копировать» в меню телефона.';});
+</script></body></html>

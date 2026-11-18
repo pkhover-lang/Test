@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Core functionality is auditing the installed inventory in the current user/profile.
+         This private APK is not a claim of Google Play policy approval. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Optional special access; only the user can enable it in system Settings. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Intentionally absent: INTERNET, Accessibility service, root, VPN, ADB,
+         storage/media, contacts, SMS, microphone, location and device administrator. -->
+    <application
+        android:name=".AuditorApplication"
+        android:label="@string/app_name"
+        android:icon="@drawable/ic_auditor"
+        android:roundIcon="@drawable/ic_auditor"
+        android:theme="@style/AuditorTheme"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false"
+        android:supportsRtl="true">
+        <activity android:name=".ui.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <provider
+            android:name=".platform.ReportProvider"
+            android:authorities="${applicationId}.reports"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>
